@@ -1,0 +1,303 @@
+---
+title: 'MRIPSundries'
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MRIPSundries}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.align='center',
+                      fig.width = 6, fig.height = 3)
+```
+
+<!-- 
+Put a flag object in the top of the doc taht shows whether the files are available … and run the code only if they are.
+
+To build lib: (1) devtools::document() (2) devtools::build_vignettes() (3) devtools::install()
+
+All devtools functions accept a path as an argument, e.g. load_all("path/to/path/mypkg"). If you don't specify a path, devtools will look in the current working directory - this is recommended practice.
+
+Frequent development tasks:
+
+    load_all() simulates installing and reloading your package, loading R code in R/, compiled shared objects in src/ and data files in data/. During development you usually want to access all functions so load_all() ignores the package NAMESPACE. load_all() will automatically create a DESCRIPTION if needed.
+
+    document() updates documentation, file collation and NAMESPACE.
+
+    test() reloads your code, then runs all testthat tests.
+
+Building and installing:
+
+    install() reinstalls the package, detaches the currently loaded version then reloads the new version with library(). Reloading a package is not guaranteed to work: see the documentation to unload() for caveats.
+
+    build() builds a package file from package sources. You can use it to build a binary version of your package.
+end -->
+
+
+
+## Purpose
+Gather together MRIP analysis functions to make life easier. In general, this package provides functions to:
+
+* load raw MRIP .csv files (trip, catch, size) and bind them together into a single R object;
+
+* calculate appropriately weighted total catch, size composition and fishing effort;
+
+* Parse out dates and put them in a format readable by R.
+
+The package does not include functions to help with plotting but there are some examples in this vignette about how the data aggregation functions in this package can easily prep the data for plots.
+
+## MRIP data
+The MRIPSundries package depends entirely on access to MRIP .csv files. These files are publicly available and can be found [here on the MRIP website](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP_Survey_Data/). Before using this package, download the data (all of it or whatever you need of it). The default file structure is fine, or if you want to re-organize the files that's fine too -- you just need to tell the package what the root directory is for the files and it ought to work.
+
+
+
+
+
+
+## Combining .csv files
+The .csv files hosted by MRIP are organized into trip, catch and size files, by wave -- in other words each wave in each year has it's own trip, catch and size .csv. To make things easier to work with, the ```bindMRIP()``` function takes the .csv files you are interested in and binds them together in a data frame.
+
+For this vignette I assume that the files exist in a directory called mripDat which is a folder in the working directory.
+
+Before doing anything else it would be useful to load the MRIPSundries library!
+
+```{r message=FALSE, warning=FALSE}
+library(MRIPSundries)
+```
+
+First let's check out what files we have:
+
+```{r}
+getwd()
+fl <- list.files('xdata', full.names = TRUE)
+print(head(fl))
+```
+
+So we have catch, size and trip mrip files from waves 4 & 5 in 2050-2052. I chose these years to avoid any confusion that the data in this vignette might be real data! If it's already 2052 and I've confused you, sorry. Before we can do much we first have to take these .csv files of each type and bind them together. To do this we can use the ```bindMRIP()``` function. First, just to show everything we have, let's load in some catch data and not do any subsetting. All we have to do is provide a directory (remember, this assumes that mripDat is a folder in our working directory) and the type of files we want to load.
+
+```{r, message=FALSE}
+# Bind together catch data
+mDatC <- bindMRIP(dir = 'xdata',      # Directory holding the .csv files
+                  type = 'catch',     # Type of .csv files to bind together
+                  years = 2050:2052,  # Years to include
+                  waves = 4:5)        # Waves to include
+```
+
+The bindMRIP function is useful, but note that reading in and binding together many large .csv files can take a while. Different types of data can be much faster to load in. If you keep re-running code, one solution is to run the ```bindMRIP()``` function once, then save the output as an rds object using ```saveRDS()```; after that you can load it back in using ```loadRDS()``` and you can skip ```bindMRIP()```.
+
+### Checking out the data
+
+We have standard tools to check out mdatTemp such as ```summary()``` and ```head()``` but a useful function from this package is ```get_dataStats()```
+
+```{r}
+get_dataStats(mDatC)
+```
+
+From here we can see that we have years from 2050-2052, two distinct species (if there were only one it would print the name), modes 3, 4, 5 and 7 and waves 4 and 5 (both of which are present in all three years).
+
+Let's take a peek at the column names. Note that the actual MRIP data sets have more column names -- this is cut down for simuled data.
+
+```{r}
+names(mDatC)
+```
+
+Sometimes exact definitions can be confusing to remember. We can use the ```printColDef()``` function to print out the definition of one or more columns.
+
+```{r}
+printColDef(colName = c('MODE_FX'))
+```
+
+The function will search through variable names and definitions from the trip, catch and size data bases. The definitions come from the MRIP website [here](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP Survey Data/) under *MRIP survey variables.xlsx*. Note that we have to spell the <colName> arguments correctly correctly but we don't have to worry about case.
+
+
+
+## Data summaries
+### Calculating summed or averaged catch / harvest
+
+The ```get_catch()``` function calculates catch in numbers and weight. The arguments are
+
+* **cdat**, the catch data set (typically built using bindMRIP() with the *type* argument ‘catch’;
+
+* **group** which indicates the structure of the output (e.g., do you want catch by just mode? Mode and wave?); and
+
+* **agFun** which is the aggregation function. This will typically be sum if calculating annual statistics (i.e., if you include YEAR in the *group* argument) but could be something like mean if you wanted to know the mean catch over a range of years (i.e., if you do not include YEAR in *group*).
+
+The output is harvest in numbers (HN), releases in numbers (RN), harvest in kilograms (HKG) and harvest in pounds (HLB). Let’s find the annual catch for our data just by year
+
+```{r}
+catY <- get_catch(mDatC,                # data set from bindMRIP()
+                  group = c('YEAR'),    # structure of output
+                  common = 'BLUEFISH')  # species
+knitr::kable(catY, digits=0)            # print a nice table
+```
+
+and now by year and mode (not all rows shown)
+
+```{r}
+catYM <- get_catch(mDatC,                         # Data from bindMRIP()
+                   group = c('YEAR', 'MODE_FX'),  # columns to group by
+                   common = 'BLUEFISH')           # species
+knitr::kable(head(catYM), digits=0)                     # print a nice table
+```
+
+
+### Calculating catch composition
+
+The ```get_harvestSizeComp()``` function calculates the size composition of the harvest, appropriately weighted by WP_CATCH. The arguments are
+
+* **sdat**: the size data frame, that typically comes from a call to ```bindMRIP()``` with argument *type* set to size;
+
+* **group**: A vector of column names to structure output over (Year, wave, MODE_FX, etc.); and
+
+* **units**: a string, either ‘in’ for inches or ‘cm’ for centimeters.
+
+Let’s test the function, looking at the size composition over year and mode. Before we do this though we have to use ```bindMRIP()``` do develop a data frame from the size csv files:
+
+```{r, message=FALSE}
+# Bind together size data
+mDatS <- bindMRIP(dir = 'xdata',     # Directory holding the .csv files
+                  type = 'size')     # Type of file to bind together
+```
+
+
+Now we can get the size distribution in inches (only the first 15 rows printed here):
+
+```{r}
+sizYW <- get_harvestSizeComp(sdat = mDatS,            # Data set from bindMRIP()
+                             group = c('YEAR', 'WAVE'),  # Structure of output
+                             common = 'BLUEFISH',
+                             unit = 'in')             # Desired units
+knitr::kable(head(sizYW, 15), digits=0)               # Print a nice table
+```
+
+### Calculating effort
+
+The ```get_effort()``` function calculates the size composition of the harvest, appropriately weighted by WP_INT. The arguments are
+
+* **tdat**: the trip data frame, that typically comes from a call to bindMRIP() with argument type set to 'trip';
+
+* **common**: Common name of the species of interest
+
+* **group**: A vector of column names to structure output over (Year, wave, MODE_FX, etc.); and
+
+* **cdat**: the catch data frame, typically coming from a call to bindMRIP() with argument *type* set to 'catch' (argument is optional and only necessary if *type* includes 'A', 'B1' or 'B2';
+
+Let’s test the function, and define fishing effort as all trips where bluefish were targeted as either the primary or secondary target. We will also subset the output to look only at Massachusetts. We already have a catch data set **mdatC** so we will only need to bind together the trip data. Note that we have to use the same year and wave parameters for both the catch and the trip data sets or the function will produce an error.
+
+```{r, message = FALSE}
+# Bind together trip data
+mDatT <- bindMRIP(dir = 'xdata',      # Directory holding the .csv files
+                  type = 'trip',      # Type of .csv files to bind together
+                  years = 2050:2052,  # Years to include
+                  waves = 4:5)        # Waves to include
+
+eff <- get_effort(tdat = mDatT,                              # Trip data set
+                  common = 'BLUEFISH',                       # species of interest
+                  group = c('YEAR', 'ST'),                   # grouping over
+                  type = c('PRIM1_COMMON', 'PRIM2_COMMON'))  # effort definition
+
+knitr::kable(eff, digits = 0)
+```
+
+We can also partition the trip data over other groupings such as fishing mode (MODE_FX). In this case we specify effort as all trips where bluefish were targeted or landed (i.e., everything but *type* = 'B2'. Because we include landed catch we have to include the argument *cdat*. To avoid issues we have to specify a catch data set that includes only the species we are interested in (bluefish)
+
+```{r, message = FALSE}
+sp <- 'BLUEFISH'
+mDatCBlue <- filter(mDatC, COMMON == 'BLUEFISH')
+
+eff2 <- get_effort(tdat = mDatT,                            # Trip data set
+                   cdat = mDatCBlue,                        # Catch data set
+                   common = 'BLUEFISH',                     # species of interest
+                   group = c('YEAR', 'ST', 'MODE_FX'),      # grouping over
+                   type = c('PRIM1_COMMON', 'PRIM2_COMMON',
+                           'A', 'B1')) %>%                  # effort definition
+  filter(ST == 25 & YEAR == 2050)                           # Just worry about MA in 2050
+  
+knitr::kable(eff2, digits = 0)
+```
+
+## Adding dates
+
+The trip, catch and size data frames all have month associated with each record. However, it could be useful to have finer-scale information on the distribution of records. ```The get_date()``` function parses the ID_CODE column to pull out the year/month/day information and then converts this to an object of class Date which is interpretable by R.
+
+```{r}
+d <- get_date(mDatC)
+print(head(d))
+```
+
+
+
+## Plotting
+
+The package does not have specific plotting functions. However a couple of examples are given here using the ggplot2 package.
+
+### Annual catch
+
+Plot of annual catch (MA & RI combined) by mode (using the catYM data frame created above)
+
+```{r}
+catYM %>%        # References data set created above
+  mutate(MODE_FX = as.character(MODE_FX)) %>%  # Treat MODE+FX as string
+  ggplot(aes(x = YEAR, y = HLB,                # Assign x and y
+             group = MODE_FX)) +               # Assign grouping variable
+  geom_line(aes(color = MODE_FX),   # Adjust color by group
+            size = 2) +             # Adjust line width
+  geom_point(size = 2)              # Add points
+```
+
+Below is a plot of annual catch by wave, using a barplot. Here we have to re-run the ```get_catch()``` function to get output structured by wave. WAVE was changed to a character variable as an easy way to improve the apearance of the plot and legend.
+
+```{r}
+catYW <- get_catch(mDatC,   # Data frame created by bindMRIP()
+                   group = c('YEAR', 'WAVE', 'ST'),     # Structure of output
+                   common = 'BLUEFISH') %>%             # species name
+  mutate(WAVE = as.character(WAVE))                     # Treat wave as string
+ggplot(catYW, aes(x = YEAR, y=HLB,                      # Assign x and y
+                  fill = WAVE)) +                       # Fill color is wave
+  geom_bar(stat = 'identity') +     # Add barplot - identity treats values as-is
+  facet_wrap(~ST)                   # Different panels by year
+```
+
+### Size composition
+
+
+```{r}
+ggplot(sizYW, aes(x = L_IN_BIN, y = HN)) +  # Assign x and y
+  geom_bar(stat = 'identity') +             # Add barplot
+  facet_wrap(~YEAR)                         # Panels are different years
+```
+
+
+
+### Cumulative catch
+
+With date information we can do things like plot the cumulative distribution of catch during each year.
+
+```{r}
+mDatC %>%    # Data set created earlier
+  add_column(Date = get_date(dat = mDatC)) %>%            # Add a date column
+  filter(COMMON == 'BLUEFISH') %>%                        # Subset for bluefish
+  arrange(Date) %>%                                       # Sort by date
+  group_by(YEAR) %>%                                      # Year is grouping variable
+  mutate(cumHarv = cumsum(LANDING * WP_CATCH / 1e6)) %>%  # Calculate cumulative harvest
+  ggplot(., aes(x = Date, y = cumHarv)) +                 # Assign x and y
+  facet_wrap(~YEAR,                                       # Panels should be years
+             scales = 'free_x',                           # No common x labels
+             nc = 2) +                                    # Two panel columns
+  geom_line() +                                           # Include lines
+  geom_point() +                                          # Include points
+  ylab('Cumulative harvest (mil)')                        # Change y label
+```
+
+
+
+## 
+
+
+
+
+
+
+

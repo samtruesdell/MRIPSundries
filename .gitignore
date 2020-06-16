@@ -1,0 +1,16 @@
+doc
+Meta
+.Rproj.user
+*.Rds
+*.html
+
+# remove once you want people to download package from github
+*.Rd
+DESCRIPTION
+
+# For now do not stage the .csv files generated for vignette data
+*.csv
+
+# Do not stage drafts or scratch
+drafts*
+scratch*
