@@ -40,16 +40,16 @@ end -->
 ## Purpose
 Gather together MRIP analysis functions to make life easier. In general, this package provides functions to:
 
-* load raw MRIP .csv files (trip, catch, size) and bind them together into a single R object;
-
-* calculate appropriately weighted total catch, size composition and fishing effort;
+* load raw MRIP .csv files (trip, catch, size) and bind them together into a single R object and calculate appropriately weighted total catch, size composition and fishing effort;
 
 * Parse out dates and put them in a format readable by R.
+
+* load MRIP estimate files (catch, effort) and bind them together into a single R object, calculating aggregated means and PSEs as necessary
 
 The package does not include functions to help with plotting but there are some examples in this vignette about how the data aggregation functions in this package can easily prep the data for plots.
 
 ## MRIP data
-The MRIPSundries package depends entirely on access to MRIP .csv files. These files are publicly available and can be found [here on the MRIP website](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP_Survey_Data/). Before using this package, download the data (all of it or whatever you need of it). The default file structure is fine, or if you want to re-organize the files that's fine too -- you just need to tell the package what the root directory is for the files and it ought to work.
+The MRIPSundries package depends entirely on access to MRIP .csv files. The intercept files are publicly available and can be found [here on the MRIP website](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP_Survey_Data/) and the estimate files can be found [here](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP_Estimate_Data/). Before using this package, download the data (all of it or whatever you need of it). The default file structure is fine, or if you want to re-organize the files that's fine too -- you just need to tell the package what the root directory is for the files and it ought to work.
 
 
 
@@ -71,7 +71,7 @@ First let's check out what files we have:
 
 ```{r}
 getwd()
-fl <- list.files('xdata', full.names = TRUE)
+fl <- list.files('vinData', full.names = TRUE)
 print(head(fl))
 ```
 
@@ -79,7 +79,7 @@ So we have catch, size and trip mrip files from waves 4 & 5 in 2050-2052. I chos
 
 ```{r, message=FALSE}
 # Bind together catch data
-mDatC <- bindMRIP(dir = 'xdata',      # Directory holding the .csv files
+mDatC <- bindMRIP(dir = 'vinData',      # Directory holding the .csv files
                   type = 'catch',     # Type of .csv files to bind together
                   years = 2050:2052,  # Years to include
                   waves = 4:5)        # Waves to include
@@ -89,7 +89,7 @@ The bindMRIP function is useful, but note that reading in and binding together m
 
 ### Checking out the data
 
-We have standard tools to check out mdatTemp such as ```summary()``` and ```head()``` but a useful function from this package is ```get_dataStats()```
+We have standard tools to check out mDatC such as ```summary()``` and ```head()``` but a useful function from this package is ```get_dataStats()```
 
 ```{r}
 get_dataStats(mDatC)
@@ -97,11 +97,13 @@ get_dataStats(mDatC)
 
 From here we can see that we have years from 2050-2052, two distinct species (if there were only one it would print the name), modes 3, 4, 5 and 7 and waves 4 and 5 (both of which are present in all three years).
 
-Let's take a peek at the column names. Note that the actual MRIP data sets have more column names -- this is cut down for simuled data.
+Let's take a peek at the column names. Note that the actual MRIP data sets have more column names -- this is cut down for simulated data.
 
 ```{r}
 names(mDatC)
 ```
+
+Note that while the column names are the same as in the raw data files all the columns coming out of ```bind_mrip()``` are capitalized. This was an easy fix for some changes that had been made to the raw data standards over time and may be fixed in the future for consistency with the .csv files.
 
 Sometimes exact definitions can be confusing to remember. We can use the ```printColDef()``` function to print out the definition of one or more columns.
 
@@ -109,7 +111,7 @@ Sometimes exact definitions can be confusing to remember. We can use the ```prin
 printColDef(colName = c('MODE_FX'))
 ```
 
-The function will search through variable names and definitions from the trip, catch and size data bases. The definitions come from the MRIP website [here](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP Survey Data/) under *MRIP survey variables.xlsx*. Note that we have to spell the <colName> arguments correctly correctly but we don't have to worry about case.
+The function will search through variable names and definitions from the trip, catch and size data bases. The definitions come from the MRIP website [here](https://www.st.nmfs.noaa.gov/st1/recreational/MRIP Survey Data/) under *MRIP survey variables.xlsx*. Note that we have to spell the <colName> arguments correctly correctly but we don't have to worry about case in this function.
 
 
 
@@ -122,7 +124,7 @@ The ```get_catch()``` function calculates catch in numbers and weight. The argum
 
 * **group** which indicates the structure of the output (e.g., do you want catch by just mode? Mode and wave?); and
 
-* **agFun** which is the aggregation function. This will typically be sum if calculating annual statistics (i.e., if you include YEAR in the *group* argument) but could be something like mean if you wanted to know the mean catch over a range of years (i.e., if you do not include YEAR in *group*).
+* **agFun** which is the aggregation function. This will typically be ```sum``` if calculating annual statistics (i.e., if you include YEAR in the *group* argument) but could be something like mean if you wanted to know the mean catch over a range of years (i.e., if you do not include YEAR in *group*).
 
 The output is harvest in numbers (HN), releases in numbers (RN), harvest in kilograms (HKG) and harvest in pounds (HLB). Let’s find the annual catch for our data just by year
 
@@ -139,7 +141,7 @@ and now by year and mode (not all rows shown)
 catYM <- get_catch(mDatC,                         # Data from bindMRIP()
                    group = c('YEAR', 'MODE_FX'),  # columns to group by
                    common = 'BLUEFISH')           # species
-knitr::kable(head(catYM), digits=0)                     # print a nice table
+knitr::kable(head(catYM), digits=0)               # print a nice table
 ```
 
 
@@ -157,7 +159,7 @@ Let’s test the function, looking at the size composition over year and mode. B
 
 ```{r, message=FALSE}
 # Bind together size data
-mDatS <- bindMRIP(dir = 'xdata',     # Directory holding the .csv files
+mDatS <- bindMRIP(dir = 'vinData',     # Directory holding the .csv files
                   type = 'size')     # Type of file to bind together
 ```
 
@@ -165,16 +167,16 @@ mDatS <- bindMRIP(dir = 'xdata',     # Directory holding the .csv files
 Now we can get the size distribution in inches (only the first 15 rows printed here):
 
 ```{r}
-sizYW <- get_harvestSizeComp(sdat = mDatS,            # Data set from bindMRIP()
+sizYW <- get_harvestSizeComp(sdat = mDatS,               # Data set from bindMRIP()
                              group = c('YEAR', 'WAVE'),  # Structure of output
                              common = 'BLUEFISH',
-                             unit = 'in')             # Desired units
-knitr::kable(head(sizYW, 15), digits=0)               # Print a nice table
+                             unit = 'in')                # Desired units
+knitr::kable(head(sizYW, 15), digits = 0)                # Print a nice table
 ```
 
 ### Calculating effort
 
-The ```get_effort()``` function calculates the size composition of the harvest, appropriately weighted by WP_INT. The arguments are
+The ```get_effort()``` function calculates fishing effort in number of trips, appropriately weighted by WP_INT. The arguments are
 
 * **tdat**: the trip data frame, that typically comes from a call to bindMRIP() with argument type set to 'trip';
 
@@ -182,13 +184,20 @@ The ```get_effort()``` function calculates the size composition of the harvest, 
 
 * **group**: A vector of column names to structure output over (Year, wave, MODE_FX, etc.); and
 
+* **type**: A vector of the types of trips to include in the effort calculation. Options are:
+  * PRIM1_COMMON: primary target
+  * PRIM2_COMMON: secondary target
+  * A: type A catch recorded during trip
+  * B1: type B1 catch recorded during trip
+  * B2: type B2 catch recorded during trip
+
 * **cdat**: the catch data frame, typically coming from a call to bindMRIP() with argument *type* set to 'catch' (argument is optional and only necessary if *type* includes 'A', 'B1' or 'B2';
 
 Let’s test the function, and define fishing effort as all trips where bluefish were targeted as either the primary or secondary target. We will also subset the output to look only at Massachusetts. We already have a catch data set **mdatC** so we will only need to bind together the trip data. Note that we have to use the same year and wave parameters for both the catch and the trip data sets or the function will produce an error.
 
 ```{r, message = FALSE}
 # Bind together trip data
-mDatT <- bindMRIP(dir = 'xdata',      # Directory holding the .csv files
+mDatT <- bindMRIP(dir = 'vinData',      # Directory holding the .csv files
                   type = 'trip',      # Type of .csv files to bind together
                   years = 2050:2052,  # Years to include
                   waves = 4:5)        # Waves to include
@@ -201,7 +210,7 @@ eff <- get_effort(tdat = mDatT,                              # Trip data set
 knitr::kable(eff, digits = 0)
 ```
 
-We can also partition the trip data over other groupings such as fishing mode (MODE_FX). In this case we specify effort as all trips where bluefish were targeted or landed (i.e., everything but *type* = 'B2'. Because we include landed catch we have to include the argument *cdat*. To avoid issues we have to specify a catch data set that includes only the species we are interested in (bluefish)
+We can also partition the trip data over other groupings such as fishing mode (MODE_FX). In this example we specify effort as all trips where bluefish were targeted or landed (i.e., everything but *type* = 'B2'. Because we include landed catch we have to include the argument *cdat*. To avoid issues we have to specify a catch data set that includes only the species we are interested in (bluefish)
 
 ```{r, message = FALSE}
 sp <- 'BLUEFISH'
@@ -228,6 +237,28 @@ print(head(d))
 ```
 
 
+## MRIP estimate files
+The MRIP estimate files include both catch and effort data. The catch data include many of the same columns as the intercept data, just aggregated over groupings such as state, mode, etc. and, importantly, they include the variance. This allows for calculating PSEs over any grouping[^1] and the effort data include columns for estimated number of trips and the variances over the typical grouping levels.
+
+[^1]: Note that (1) the variance of a sum equals the sum of the variances, making it easy to combine uncertainty at different levels of aggregation; and (2) PSE is the same as CV -- the coefficient of variation -- which is the standard deviation divided by the mean.
+
+This vignette does not currently have dummy data for the MRIP estimates. However, implementation is much the same as for the ```bindMRIP()``` function above and will suffice for now. The function arguments are:
+
+* **dir** the directory containing the MRIP estimate files
+* **type** the desired type of estimates -- 'catch' or 'trip'
+* **years** the years of interest (this governs which files are loaded in -- further groupings are available using the XXXXXX function).
+
+```
+bindMRIPEstimates(dir = 'estData',             # path to folder containing .csv files
+                  type = 'catch',              # specifies catch data sets
+                  years = 2050:2052)           # years to include
+```
+
+Aggregation of the data over different levels is through the XXXXXX function.
+
+```
+XXXXXX()
+```
 
 ## Plotting
 
