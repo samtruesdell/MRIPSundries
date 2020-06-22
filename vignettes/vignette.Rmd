@@ -71,7 +71,7 @@ First let's check out what files we have:
 
 ```{r}
 getwd()
-fl <- list.files('vinData', full.names = TRUE)
+fl <- list.files('vinData/mrip_raw', full.names = TRUE)
 print(head(fl))
 ```
 
@@ -242,16 +242,18 @@ The MRIP estimate files include both catch and effort data. The catch data inclu
 
 [^1]: Note that (1) the variance of a sum equals the sum of the variances, making it easy to combine uncertainty at different levels of aggregation; and (2) PSE is the same as CV -- the coefficient of variation -- which is the standard deviation divided by the mean.
 
-This vignette does not currently have dummy data for the MRIP estimates. However, implementation is much the same as for the ```bindMRIP()``` function above and will suffice for now. The function arguments are:
+This vignette has some simple dummy data for MRIP estimates located in the folder vinData/mrip_raw. Implementation is much the same as for the ```bindMRIP()``` function. The function arguments are:
 
 * **dir** the directory containing the MRIP estimate files
 * **type** the desired type of estimates -- 'catch' or 'trip'
 * **years** the years of interest (this governs which files are loaded in -- further groupings are available using the XXXXXX function).
 
-```
-bindMRIPEstimates(dir = 'estData',             # path to folder containing .csv files
-                  type = 'catch',              # specifies catch data sets
-                  years = 2050:2052)           # years to include
+```{r}
+bdEst <- bindMRIPEstimates(dir = 'vinData/mrip_est', # path to folder containing .csv files
+                  type = 'catch',         # specifies catch data sets
+                  years = 2050:2052)      # years to include
+
+knitr::kable(head(bdEst, 12), digits = 0)
 ```
 
 Aggregation of the data over different levels is through the XXXXXX function.
