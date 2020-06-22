@@ -1,5 +1,6 @@
 
-
+library(MRIPSundries)
+library(msm)
 
 
 IDCodeFun <- function(y, w){
@@ -103,12 +104,45 @@ for(i in seq_along(yr)){
   }
 }
 
+# temp
+x <- bindMRIPEstimates(dir = 'C:/truesdell/MRIPGeneral/data/mripEst_2020-05-19/',   # path to folder containing .csv files
+                  type = 'catch',   # specifies catch data sets
+                  years = 2014:2017)
+
+cv <- 0.3
+
+catDat <- csvLst[seq(1, length(csvLst), by = 3)]
+
+catEstLst <- list()
+for(i in 1:length(catDat)){
+  catDatTmp <- catDat[[i]]
+  attributes(catDatTmp)$bindMRIPFrame <- 'xxxxxcatch'
+  catEstLst[[i]] <- get_catch(cat,
+            group = c('YEAR', 'ST', 'WAVE', 'MODE_FX'),
+            common = 'BLACK SEA BASS') %>%
+    rename(year = YEAR, st = ST, wave = WAVE, mode_fx = MODE_FX,
+           landing = HN, estrel = RN, common = COMMON) %>%
+    mutate(status = 'FINAL',
+           land_var = rtnorm(n(), mean = landing, sd = cv * landing)^2,
+           estrelvar = rtnorm(n(), mean = estrel, sd = cv * estrel)^2,
+           tot_cat = landing + estrel) %>%
+    select(status, year, wave, st, common, mode_fx, landing, land_var, estrel,
+           estrelvar, tot_cat)
+}
+catEst <- bind_rows(catEstLst)
+
+
+# landing, land_var, estrel, estrelvar,
+# tot_cat, lbs_ab1, var_lbs
+
 
 
 dir.create('vignettes/vinData')
 mapply(write.csv, x = csvLst,
        file = file.path('vignettes/vinData', paste0(names(csvLst), '.csv')),
        row.names = FALSE)
+write_csv(catEst, path = file.path('vignettes/vinData', 'mrip_catch_wave',
+                                   paste0(min(yr), '_', max(yr), '.csv')))
 
 
 
