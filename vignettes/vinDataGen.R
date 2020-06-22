@@ -104,10 +104,7 @@ for(i in seq_along(yr)){
   }
 }
 
-# temp
-x <- bindMRIPEstimates(dir = 'C:/truesdell/MRIPGeneral/data/mripEst_2020-05-19/',   # path to folder containing .csv files
-                  type = 'catch',   # specifies catch data sets
-                  years = 2014:2017)
+
 
 cv <- 0.3
 
@@ -117,12 +114,13 @@ catEstLst <- list()
 for(i in 1:length(catDat)){
   catDatTmp <- catDat[[i]]
   attributes(catDatTmp)$bindMRIPFrame <- 'xxxxxcatch'
-  catEstLst[[i]] <- get_catch(cat,
+  catEstLst[[i]] <- get_catch(catDatTmp,
             group = c('YEAR', 'ST', 'WAVE', 'MODE_FX'),
             common = 'BLACK SEA BASS') %>%
     rename(year = YEAR, st = ST, wave = WAVE, mode_fx = MODE_FX,
            landing = HN, estrel = RN, common = COMMON) %>%
     mutate(status = 'FINAL',
+           # Something for the variance that is at least on the right scale
            land_var = rtnorm(n(), mean = landing, sd = cv * landing)^2,
            estrelvar = rtnorm(n(), mean = estrel, sd = cv * estrel)^2,
            tot_cat = landing + estrel) %>%
@@ -132,17 +130,48 @@ for(i in 1:length(catDat)){
 catEst <- bind_rows(catEstLst)
 
 
-# landing, land_var, estrel, estrelvar,
-# tot_cat, lbs_ab1, var_lbs
+
+
+
+# MRIP estimate trip data
+tripDat <- csvLst[seq(2, length(csvLst), by = 3)]
+
+tripEstLst <- list()
+for(i in 1:length(tripDat)){
+  tripDatTmp <- tripDat[[i]]
+  attributes(tripDatTmp)$bindMRIPFrame <- 'type[trip]_x_x'
+  catDatTmp <- catDat[[i]]
+  attributes(catDatTmp)$bindMRIPFrame <- 'type[catch]_x_x'
+  tripEstLst[[i]] <- get_effort(tdat = tripDatTmp,
+                                cdat = catDatTmp,
+                                group = c('YEAR', 'ST', 'WAVE', 'MODE_FX'),
+                                common = 'BLACK SEA BASS',
+                                type = c("PRIM1_COMMON", "PRIM2_COMMON", "A",
+                                         "B1", "B2")) %>%
+    rename(year = YEAR, st = ST, wave = WAVE, mode_fx = MODE_FX) %>%
+    mutate(status = 'FINAL',
+           estrips = rlnorm(n(), mean = log(2e3), sd = 2),
+           # Something for the variance that is at least on the right scale
+           NUMVAR = rtnorm(n(), mean = estrips, sd = cv * estrips)^2) %>%
+    select(status, mode_fx, year, wave, st, estrips, NUMVAR)
+}
+tripEst <- bind_rows(catEstLst)
 
 
 
 dir.create('vignettes/vinData')
+dir.create('vignettes/vinData/mrip_est')
+dir.create('vignettes/vinData/mrip_raw')
 mapply(write.csv, x = csvLst,
-       file = file.path('vignettes/vinData', paste0(names(csvLst), '.csv')),
+       file = file.path('vignettes/vinData/mrip_raw',
+                        paste0(names(csvLst), '.csv')),
        row.names = FALSE)
-write_csv(catEst, path = file.path('vignettes/vinData', 'mrip_catch_wave',
-                                   paste0(min(yr), '_', max(yr), '.csv')))
+write_csv(catEst, path = file.path('vignettes/vinData/mrip_est',
+                                   paste0('mrip_catch_wave_',
+                                   min(yr), '_', max(yr), '.csv')))
+write_csv(tripEst, path = file.path('vignettes/vinData',
+                                    paste0('mrip_effort_',
+                                    min(yr), '_', max(yr), '.csv')))
 
 
 
