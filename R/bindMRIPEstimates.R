@@ -28,7 +28,7 @@
 
 
 bindMRIPEstimates <- function(dir, type = c('catch', 'effort'),
-                     years = NULL){
+                              years = NULL){
 
 
   # List all files in the given directory
