@@ -3,6 +3,7 @@
 export(bindMRIP)
 export(bindMRIPEstimates)
 export(get_catch)
+export(get_catchEstimates)
 export(get_dataStats)
 export(get_date)
 export(get_effort)
