@@ -15,10 +15,6 @@
 #' @param years Vector of years to include in the output data frame.
 #' @param waves Vector of waves to include in the output data frame (1-6).
 #' @param common Vector of common names to include in the output data frame.
-#' @param firstYearMin Minimum value for first year of data. Defaults to 1982
-#'                     as there are some differences in naming convention in
-#'                     1981 that interfere with other functions. 1981 may be
-#'                     used if desired.
 #'
 #' @return Data frame derived from trip, catch or size .csv files
 #'
@@ -34,8 +30,7 @@
 
 
 bindMRIP <- function(dir, type = c('trip', 'catch', 'size'),
-                     years = NULL, waves = NULL, common = NULL,
-                     firstYearMin = 1982){
+                     years = NULL, waves = NULL, common = NULL){
 
   if(!type %in% c('trip', 'catch', 'size')){
     stop('type must be one of trip, catch or size')
@@ -77,10 +72,6 @@ bindMRIP <- function(dir, type = c('trip', 'catch', 'size'),
 
   if(is.null(years)){
     years <- fYear
-  }
-
-  if(min(years) < firstYearMin){
-    years <- years[years >= firstYearMin]
   }
 
   if(is.null(waves)){
