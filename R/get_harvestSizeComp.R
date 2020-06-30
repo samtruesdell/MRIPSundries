@@ -71,10 +71,11 @@ get_harvestSizeComp <- function(sdat, group, common = NULL,
 
 
 
-  ag <- group_by_at(sdat, vars(all_of(c(group, uname)))) %>%
+  ag <- sdat %>%
+    group_by_at(vars(all_of(c(group, uname)))) %>%
     summarise(HN = sum(WP_SIZE),
-              HKG = sum(WP_SIZE * WGT)) %>%
-    ungroup()
+              HKG = sum(WP_SIZE * WGT),
+              .groups = 'drop')
 
   ag$HLB <- ag$HKG * 2.2046226218
 
