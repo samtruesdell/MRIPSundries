@@ -10,19 +10,26 @@
 #' @param group A string of column names to structure output over (YEAR,
 #'              COMMON, WAVE, MODE_FX, etc.).
 #'
+#' @param observedOnly Flag indicating whether to limit intercepts/interviews
+#'                     to scenarios where a fish was *actually* observed
+#'                     (i.e., it was measured by the interviewer and thus the
+#'                     record for "Claim" in the data set was > 0). Defaults
+#'                     to FALSE.
+#'
 #' @return A data frame with the outputs structured by the inputs to the
 #'         <group> argument.
 #'
 #' @examples
-#' int <- get_intCount(cdat = cdat,    # Catch data frame
-#'                     tdat = tdat,    # Trip data frame
-#'                     group = group)  # Grouping vector
+#' int <- get_intCount(cdat = cdat,           # Catch data frame
+#'                     tdat = tdat,           # Trip data frame
+#'                     group = group,         # Grouping vector
+#'                     observedOnly = FALSE)  # Observation flag
 #'
 #' @export
 
 
 
-get_intCount <- function(cdat, tdat, group){
+get_intCount <- function(cdat, tdat, group, observedOnly = FALSE){
 
   # cdat_typ <- substr(attributes(cdat)$bindMRIPFrame, 6, 10)
   # if(cdat_typ != 'catch'){
@@ -85,15 +92,38 @@ get_intCount <- function(cdat, tdat, group){
              'WP_INT', 'VAR_ID', 'ARX_METHOD', 'ALT_FLAG')
   ct <- left_join(cdat, tdat, by = jcols)
 
+  # Claim indicates the individuals that were available to be observed and
+  # measured. If minClaim == 0 then all intercepts where the fish was
+  # harvested will be included. If minClaim == 1 then only intercepts where
+  # at least 1 fish was measured will be included.
+  minClaim <- ifelse(observedOnly == TRUE, yes = 1, no = 0)
 
   grpName <- sapply(group, as.name)
 
+  # Use for completing rows ... if wave/year/mode are included should be sure to
+  # include all potential options. If/else statements used to provide complete
+  # list for necessary variables.
+  grpName2 <- lapply(grpName, function(x){
+    if(x == 'MODE_FX'){
+      ret <- c(3,4,5,7)
+    }else if(x == 'WAVE'){
+      ret <-1:6
+    }else if(x == 'YEAR'){
+      ret <- full_seq(ct$YEAR,1)
+    }else{
+      ret <- x
+    }
+    return(ret)})
+
   out <- ct %>%
+    filter(CLAIM >= minClaim) %>%
     group_by_at(group) %>%
     summarize(nIntercept = length(unique(LEADER)),
-              nInterview = n(), .groups = 'drop') %>%
+              nInterview = length(unique(ID_CODE)),
+              .groups = 'drop') %>%
+              # nInterview = n(), .groups = 'drop') %>%
     ungroup() %>%
-    complete(!!!grpName, fill = list(nIntercept = 0, nInterview = 0))
+    complete(!!!grpName2, fill = list(nIntercept = 0, nInterview = 0))
 
   return(out)
 
