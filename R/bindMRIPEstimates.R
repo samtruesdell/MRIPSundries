@@ -86,8 +86,12 @@ bindMRIPEstimates <- function(dir, type = c('catch', 'effort'),
 
   getFileIdx <- function(pat){
 
+    # Edit file names to remove any reference to "preliminary" because it
+    # messes up the max year calculation
+    fn2 <- str_remove(flName, '_preliminary')
+
     id <- grep(pattern = pat, x = fl, value = FALSE)
-    mat <- str_split(string = flName[id], pattern = '_|.csv', simplify = TRUE)
+    mat <- str_split(string = fn2[id], pattern = '_|.csv', simplify = TRUE)
     blank <- which(mat[,ncol(mat)-1] == '')
     mat[blank,ncol(mat)-1] <- mat[blank,ncol(mat)-2]
     minYr <- as.numeric(mat[,ncol(mat)-2])
