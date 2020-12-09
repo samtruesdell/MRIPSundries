@@ -14,7 +14,8 @@
 #'                     to scenarios where a fish was *actually* observed
 #'                     (i.e., it was measured by the interviewer and thus the
 #'                     record for "Claim" in the data set was > 0). Defaults
-#'                     to FALSE.
+#'                     to FALSE. Records with *only* releases are always
+#'                     removed.
 #'
 #' @return A data frame with the outputs structured by the inputs to the
 #'         <group> argument.
@@ -116,7 +117,8 @@ get_intCount <- function(cdat, tdat, group, observedOnly = FALSE){
     return(ret)})
 
   out <- ct %>%
-    filter(CLAIM >= minClaim) %>%
+    filter(LANDING > 0,             # ensure removal of rows with releases only
+           CLAIM >= minClaim) %>%
     group_by_at(group) %>%
     summarize(nIntercept = length(unique(LEADER)),
               nInterview = length(unique(ID_CODE)),
