@@ -78,12 +78,13 @@ bindMRIP <- function(dir, type = c('trip', 'catch', 'size'),
     waves <- fWave
   }
 
-  fIdx <- (fYear %in% years) & (fWave %in% waves) & fType %in% type
+  fIdx <- (fYear %in% years) & (fWave %in% waves) & (fType %in% type)
 
     # read in the data
   # csvList <- lapply(fl[fIdx], read.csv,
   #                   header = TRUE, stringsAsFactors = FALSE)
-  csvList <- lapply(fl[fIdx], read_csv, col_types = cols())
+  csvList <- lapply(fl[fIdx], read_csv, col_types = cols(), progress = FALSE)
+
 
   # structure of names changed over time ... capitilize names
   # for consistency
