@@ -56,6 +56,16 @@ get_effort <- function(tdat, cdat = NULL, common, group,
     stop('for now, don\'t include common in group...')
   }
 
+  if(is.null(attributes(tdat)$bindMRIPFrame)){
+    stop(paste('tdat attributes do not include bindMRIPFrame ...',
+               'was tdat created directly from bindMRIP()?'))
+  }
+
+  if(!is.null(cdat) & is.null(attributes(cdat)$bindMRIPFrame)){
+    stop(paste('cdat attributes do not include bindMRIPFrame ...',
+               'was cdat created directly from bindMRIP()?'))
+  }
+
   tdat_typ <- substr(attributes(tdat)$bindMRIPFrame, 6, 9)
   if(tdat_typ != 'trip'){
     stop(paste0('please provide effort data to argument tdat.\n',
@@ -136,10 +146,10 @@ get_effort <- function(tdat, cdat = NULL, common, group,
       dat <- tdat
     }else{
 
-      cdatTemp <- filter(cdat, COMMON == common[i])
+      cdatTemp <- filter(cdat, COMMON == common[i]) %>%
+        select(COMMON, ID_CODE, LANDING, CLAIM, RELEASE, HARVEST)
 
-      dat <- left_join(x = tdat, y = select(cdatTemp, COMMON, ID_CODE, LANDING,
-                                            CLAIM, RELEASE, HARVEST))
+      dat <- left_join(x = tdat, y = cdatTemp, by = 'ID_CODE')
 
       # For trips with multiple participants where not all could be interviewed
       # or where the catch could not be separated out by individual the entire
@@ -150,7 +160,8 @@ get_effort <- function(tdat, cdat = NULL, common, group,
       # party. It should be considered binary.
       grClaim <- dat %>%
         group_by(LEADER) %>%
-        summarize(claimMax = sum(CLAIM, na.rm=TRUE))
+        summarize(claimMax = sum(CLAIM, na.rm=TRUE),
+                  .groups = 'drop')
 
       dat$CLAIM2 <- grClaim$claimMax[match(dat$LEADER, grClaim$LEADER)]
     }
@@ -191,8 +202,8 @@ get_effort <- function(tdat, cdat = NULL, common, group,
     group <- group[order(match(group, groupRef))]
 
     agLst[[i]] <- group_by_at(dat[idx,], vars(all_of(group))) %>%
-      summarise(E = agFun(WP_INT, na.rm = TRUE)) %>%
-      ungroup()
+      summarise(E = agFun(WP_INT, na.rm = TRUE),
+                .groups = 'drop')
 
   }
 
