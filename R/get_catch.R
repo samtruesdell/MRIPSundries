@@ -38,6 +38,10 @@ get_catch <- function(cdat, group, common, agFun = sum){
                 'type provided was ', cdat_typ, '.'))
   }
 
+  if(is.null(common)){
+    common <- unique(cdat$COMMON)
+  }
+
   group <- c('COMMON', group)
 
   if(!all(common %in% unique(cdat$COMMON))){
@@ -68,8 +72,8 @@ get_catch <- function(cdat, group, common, agFun = sum){
   ag <- group_by_at(odat, vars(all_of(group))) %>%
     summarise(HN = agFun(LANDING * WP_CATCH),
               RN = agFun(RELEASE * WP_CATCH),
-              HKG = agFun(WGT_AB1 * WP_CATCH)) %>%
-    ungroup()
+              HKG = agFun(WGT_AB1 * WP_CATCH),
+              .groups = 'drop')
 
   ag$HLB <- ag$HKG * 2.2046226218
 
