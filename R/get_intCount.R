@@ -3,7 +3,12 @@
 #'
 #' Returns data frame containing intercepts and interview counts
 #'
-#' @param cdat A catch data frame created from bindMRIP().
+#' @param cdat A catch data frame created from bindMRIP() or NULL. If cdat is
+#'             NULL then the intercept count will be exhaustive, including
+#'             *all* species. If a catch data frame is included then *only*
+#'             intercepts that were also recorded in the catch data set will
+#'             be summed. In other words, if you just want intercepts from
+#'             a particular species you must include cdat.
 #'
 #' @param tdat A trip data frame created from bindMRIP().
 #'
@@ -15,7 +20,7 @@
 #'                     (i.e., it was measured by the interviewer and thus the
 #'                     record for "Claim" in the data set was > 0). Defaults
 #'                     to FALSE. Records with *only* releases are always
-#'                     removed.
+#'                     removed. Applies only when cdat != NULL.
 #'
 #' @return A data frame with the outputs structured by the inputs to the
 #'         <group> argument.
@@ -30,7 +35,7 @@
 
 
 
-get_intCount <- function(cdat, tdat, group, observedOnly = FALSE){
+get_intCount <- function(cdat = NULL, tdat, group, observedOnly = FALSE){
 
   # cdat_typ <- substr(attributes(cdat)$bindMRIPFrame, 6, 10)
   # if(cdat_typ != 'catch'){
@@ -59,45 +64,14 @@ get_intCount <- function(cdat, tdat, group, observedOnly = FALSE){
   #               'catch frame: ', frameC))
   # }
 
-  ### Ensure that the catch frame is equal to or a subset of the trip frame
-  # Common columns between catch and trip data frames
-  commonCol <- c('YEAR', 'ST', 'MODE_FX', 'WAVE', 'AREA_X', 'MONTH')
 
-  # Get unique values for catch
-  cintCol <-  cdat  %>%
-      select(all_of(commonCol)) %>%
-      distinct()
+  # If observedOnly is TRUE, cdat must be included
+  if(is.null(cdat) & observedOnly){
 
-  # Get unique values for trip
-  tintCol <- tdat %>%
-    select(all_of(commonCol)) %>%
-    distinct()
+    stop(cat('observedOnly option may only be used when catch data are',
+             'included (i.e., the cdat argument is not NULL)'))
 
-  # new data frame with all rows in unique catch data frame not contained in
-  # the unique trip data frame (hopefully there are none)
-  aj <- anti_join(cintCol, tintCol,
-                  by = c('YEAR', 'ST', 'MODE_FX', 'WAVE', 'AREA_X', 'MONTH'))
-
-  if(nrow(aj) > 0){
-    stop(paste('catch data set has elements not contained in the trip data',
-               'set. Check that any groupings or subsetting used during or',
-               'after a call to bind_MRIP() haven\'t offset the values. The',
-               'values checked were:', paste(commonCol, collapse = ', ')))
   }
-
-  # Join the catch and trip data frames, retaining all the catch rows. Had to
-  # remove PSU_ID from list of joining columns because it somehow leads to
-  # differences between the trip and catch data sets.
-  jcols <- c('STRAT_ID', 'YEAR', 'ST', 'MODE_FX', 'AREA_X',
-             'ID_CODE', 'SUB_REG', 'WAVE', 'KOD', 'MONTH',
-             'WP_INT', 'VAR_ID', 'ARX_METHOD', 'ALT_FLAG')
-  ct <- left_join(cdat, tdat, by = jcols)
-
-  # Claim indicates the individuals that were available to be observed and
-  # measured. If minClaim == 0 then all intercepts where the fish was
-  # harvested will be included. If minClaim == 1 then only intercepts where
-  # at least 1 fish was measured will be included.
-  minClaim <- ifelse(observedOnly == TRUE, yes = 1, no = 0)
 
   grpName <- sapply(group, as.name)
 
@@ -110,22 +84,77 @@ get_intCount <- function(cdat, tdat, group, observedOnly = FALSE){
     }else if(x == 'WAVE'){
       ret <-1:6
     }else if(x == 'YEAR'){
-      ret <- full_seq(ct$YEAR,1)
+      ret <- full_seq(tdat$YEAR,1)
     }else{
       ret <- x
     }
     return(ret)})
 
-  out <- ct %>%
-    filter(LANDING > 0,             # ensure removal of rows with releases only
-           CLAIM >= minClaim) %>%
-    group_by_at(group) %>%
-    summarize(nIntercept = length(unique(LEADER)),
-              nInterview = length(unique(ID_CODE)),
-              .groups = 'drop') %>%
-              # nInterview = n(), .groups = 'drop') %>%
-    ungroup() %>%
-    complete(!!!grpName2, fill = list(nIntercept = 0, nInterview = 0))
+  if(is.null(cdat)){
+    out <- tdat %>%
+      group_by_at(group) %>%
+      summarize(nIntercept = length(unique(LEADER)),
+                nInterview = length(unique(ID_CODE)),
+                .groups = 'drop') %>%
+
+      complete(!!!grpName2, fill = list(nIntercept = 0, nInterview = 0))
+
+  }else{
+
+
+    ### Ensure that the catch frame is equal to or a subset of the trip frame
+    # Common columns between catch and trip data frames
+    commonCol <- c('YEAR', 'ST', 'MODE_FX', 'WAVE', 'AREA_X', 'MONTH')
+
+    # Get unique values for catch
+    cintCol <-  cdat  %>%
+        select(all_of(commonCol)) %>%
+        distinct()
+
+    # Get unique values for trip
+    tintCol <- tdat %>%
+      select(all_of(commonCol)) %>%
+      distinct()
+
+    # new data frame with all rows in unique catch data frame not contained in
+    # the unique trip data frame (hopefully there are none)
+    aj <- anti_join(cintCol, tintCol,
+                    by = c('YEAR', 'ST', 'MODE_FX', 'WAVE', 'AREA_X', 'MONTH'))
+
+    if(nrow(aj) > 0){
+      stop(paste('catch data set has elements not contained in the trip data',
+                 'set. Check that any groupings or subsetting used during or',
+                 'after a call to bind_MRIP() haven\'t offset the values. The',
+                 'values checked were:', paste(commonCol, collapse = ', ')))
+    }
+
+    # Join the catch and trip data frames, retaining all the catch rows. Had to
+    # remove PSU_ID from list of joining columns because it somehow leads to
+    # differences between the trip and catch data sets.
+    jcols <- c('STRAT_ID', 'YEAR', 'ST', 'MODE_FX', 'AREA_X',
+               'ID_CODE', 'SUB_REG', 'WAVE', 'KOD', 'MONTH',
+               'WP_INT', 'VAR_ID', 'ARX_METHOD', 'ALT_FLAG')
+    ct <- left_join(cdat, tdat, by = jcols)
+
+    # Claim indicates the individuals that were available to be observed and
+    # measured. If minClaim == 0 then all intercepts where the fish was
+    # harvested will be included. If minClaim == 1 then only intercepts where
+    # at least 1 fish was measured will be included.
+    minClaim <- ifelse(observedOnly == TRUE, yes = 1, no = 0)
+
+
+
+    out <- ct %>%
+      filter(LANDING > 0,             # ensure removal of rows with releases only
+             CLAIM >= minClaim) %>%
+      group_by_at(group) %>%
+      summarize(nIntercept = length(unique(LEADER)),
+                nInterview = length(unique(ID_CODE)),
+                .groups = 'drop') %>%
+
+      complete(!!!grpName2, fill = list(nIntercept = 0, nInterview = 0))
+
+    }
 
   return(out)
 
