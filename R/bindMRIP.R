@@ -56,6 +56,13 @@ bindMRIP <- function(dir, type = c('trip', 'catch', 'size'),
   fl <- list.files(dir, full.names = TRUE, recursive = TRUE, pattern = '.csv')
   flName <- basename(fl)
 
+  # Exclude 1981 as there was no information during Wave 1
+  w1981 <- grep(pattern = '1981', x = flName)
+  if(length(w1981) > 0){
+    fl <- fl[-w1981]
+    flName <- flName[-w1981]
+  }
+
   # identify file names that match pattern
   setPath <- grep(pattern = type, x = fl, value = TRUE)
 
