@@ -17,3 +17,5 @@ scratch*
 
 # A helper file to remind me how to build the package
 buildRPackage.R
+/doc/
+/Meta/
